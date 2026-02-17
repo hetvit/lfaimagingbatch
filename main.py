@@ -1,41 +1,87 @@
-from image_processing import *
+from lfa import SimpleLFAAnalyzer
+from lfa.analysis import run_analysis
+
+def main():
+    img_path = 'LFAIMAGES/50_fold_manual_1.jpeg'
+    # img_path = 'LFAIMAGES/image7-75fold.jpeg'
+    # img_path = 'LFAIMAGES/image9-75fold2.jpeg'
+    an = SimpleLFAAnalyzer(img_path)
 
 
-# image_path = 'LFAIMAGES/'
-image_path = '50_fold_manual_1.jpeg'
+    # use package analysis function (not an.analyze())
+    results = run_analysis(
+        an, # pass analyzer as "self"
+        bg="morph",              # or "tophat", "blur", "morph_rect", ...
+        k=51,
+        normalize=False,
+        denoise=False,
+        binarize_mode="rowwise", # "rowwise" recommended for band counting (or "otsu")
+        debug_plots=True,       # True => histogram/rowwise debug figures
+    )
 
-# if __name__ == "__main__":
-#   analyzer = SimpleLFAAnalyzer("50_fold_manual_1.jpeg")
-#   analyzer.preprocess()  # enough for raw inverted image
-#   analyzer.plot_raw_row_stats_heatmap(stat="mean", tile_width=40)
-  
-  
-  
+    print("\nReturned results dict:")
+    # print(results)
+    print_analysis_report(results)
+
+    from lfa.visualization import plot_inverted_vs_corrected
+    plot_inverted_vs_corrected(an)
+    
+    try:
+        from lfa.visualization import plot_rowwise_threshold_debug
+        # plot_rowwise_threshold_debug(an)  # uses an.corrected_image, an.binary_mask, an._rowwise_debug
+    except Exception as e:
+        print(f"(Skipping extra debug plot: {e})")
+
+    # Your 2-panel + extra WL figure
+    an.visualize(save_path=None)
+
+def print_analysis_report(results):
+    """
+    Nicely formatted CLI-style report for LFA results dict.
+    """
+
+    print("\n" + "=" * 60)
+    print("LFA ANALYSIS RESULTS")
+    print("=" * 60)
+
+    status = results.get("status", "UNKNOWN")
+    num_bands = results.get("num_bands", "N/A")
+    runs = results.get("runs", [])
+    top_runs = results.get("top_runs", [])
+    bottom_runs = results.get("bottom_runs", [])
+    mid_row = results.get("mid_row", None)
+    rel_int = results.get("relative_intensity", None)
+
+    # Status line with symbol
+    if status == "POSITIVE":
+        symbol = "🟢"
+    elif status == "NEGATIVE":
+        symbol = "🔴"
+    elif status == "INVALID":
+        symbol = "⚠️"
+    else:
+        symbol = "?"
+
+    print(f"Result:              {symbol} {status}")
+    print(f"Number of Bands:     {num_bands}")
+
+    if mid_row is not None:
+        print(f"Image Midpoint Row:  {mid_row}")
+
+    if runs:
+        print(f"Detected Band Runs:  {runs}")
+
+    if top_runs or bottom_runs:
+        print(f"Top Half Runs:       {top_runs}")
+        print(f"Bottom Half Runs:    {bottom_runs}")
+
+    if rel_int is not None:
+        print(f"Relative Intensity:  {rel_int:.4f}")
+    else:
+        print("Relative Intensity:  N/A")
+
+    print("=" * 60 + "\n")
+
+
 if __name__ == "__main__":
-    # analyzer = SimpleLFAAnalyzer("50_fold_manual_1.jpeg")
-    # analyzer = SimpleLFAAnalyzer("75_fold_manual_1.jpeg")
-    # analyzer = SimpleLFAAnalyzer("image7-75fold.jpeg")
-    # analyzer = SimpleLFAAnalyzer("image9-75fold2.jpeg")
-    analyzer = SimpleLFAAnalyzer(image_path)
-
-    # Run full analysis (includes background subtraction + split_halves(use_corrected=True))
-    results = analyzer.analyze(min_test_threshold=1.0, bg='morph_ellips_mod', k=51, normalize=False, denoise=False)
-
-    # Optional debugging outputs
-    # analyzer.plot_intensity_histogram()
-    # analyzer.plot_intensity_heatmap()
-
-    # Visualize detected lines
-    # analyzer.visualize()
-    # plt.show()
-
-    # Print results dict at the end
-    print("\nResults:", results)
-
-
-
-# if __name__ == "__main__":
-#     analyzer = SimpleLFAAnalyzer("50_fold_manual_1.jpeg")
-#     results = analyzer.analyze()
-#     analyzer.visualize()
-#     plt.show()
+    main()
