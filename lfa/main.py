@@ -2,21 +2,19 @@ from lfa import SimpleLFAAnalyzer
 from lfa.analysis import run_analysis
 
 def main():
-    img_path = 'LFAIMAGES/50_fold_manual_1.jpeg'
-    # img_path = 'LFAIMAGES/image7-75fold.jpeg'
+    # img_path = 'LFAIMAGES/image3-50fold.jpeg'
+    img_path = 'LFAIMAGES/image1neg.jpeg'
     # img_path = 'LFAIMAGES/image9-75fold2.jpeg'
     an = SimpleLFAAnalyzer(img_path)
 
 
     # use package analysis function (not an.analyze())
     results = run_analysis(
-        an, # pass analyzer as "self"
-        bg="morph",              # or "tophat", "blur", "morph_rect", ...
-        k=51,
-        normalize=False,
-        denoise=False,
-        binarize_mode="rowwise", # "rowwise" recommended for band counting (or "otsu")
-        debug_plots=True,       # True => histogram/rowwise debug figures
+    an,
+    ksize=71,
+    k=5.0,
+    denoise=False,
+    debug_plots=True,
     )
 
     print("\nReturned results dict:")
