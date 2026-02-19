@@ -15,12 +15,28 @@ def four_pl(x, bottom, top, ec50, hill):
 
 # ── 1. Sample manifest ────────────────────────────────────────────────────────
 SAMPLES = [
-    {"file": "LFAIMAGES/SP_1e5.png",  "conc": 1e5},
-    {"file": "LFAIMAGES/SP_1e6.png",  "conc": 1e6},
-    {"file": "LFAIMAGES/SP_1e7.png",   "conc": 1e7},
-    {"file": "LFAIMAGES/SP_3e5.png",   "conc": 3e5},
-    {"file": "LFAIMAGES/SP_3e6.png",  "conc": 3e6},
-    {"file": "LFAIMAGES/SP_neg.png",  "conc": 0},
+    # {"file": "LFAIMAGES/50_fold_manual_1.jpeg",  "conc": 6e3},
+    # {"file": "LFAIMAGES/50_fold_manual_2.jpeg",  "conc": 6e3},
+    # {"file": "LFAIMAGES/75_fold_manual_1.jpeg",  "conc": 4e3},
+    # {"file": "LFAIMAGES/image2-25folds.jpeg",  "conc": 1.2e4},
+    # {"file": "LFAIMAGES/image3-50fold.jpeg",  "conc": 6e3},
+    # {"file": "LFAIMAGES/image4-10fold.jpeg",  "conc": 3e4},
+    # {"file": "LFAIMAGES/image5-50fold2.jpeg",  "conc": 6e3},
+    # {"file": "LFAIMAGES/image6-10fold2.jpeg",  "conc": 3e4},
+    # {"file": "LFAIMAGES/image7-75fold.jpeg",  "conc": 4e3},
+    # {"file": "LFAIMAGES/image8-25fold2.jpeg",  "conc": 1.2e4},
+    # {"file": "LFAIMAGES/image9-75fold2.jpeg",  "conc": 4e3},
+    
+    
+    {"file": "LFAIMAGES/SP-2-18/1e5_crop.jpg",  "conc": 1e5},
+    {"file": "LFAIMAGES/SP-2-18/1e6_crop.jpg",  "conc": 1e6},
+    {"file": "LFAIMAGES/SP-2-18/3e6_crop.jpg",  "conc": 3e6},
+    {"file": "LFAIMAGES/SP-2-18/1e7_crop.jpg",  "conc": 1e7},
+    {"file": "LFAIMAGES/SP-2-18/3e7_crop.jpg",  "conc": 3e7},
+    {"file": "LFAIMAGES/SP-2-18/1e8_crop.jpg",  "conc": 1e8},
+    {"file": "LFAIMAGES/SP-2-18/3e8_crop_manual.jpg",  "conc": 3e8},
+    {"file": "LFAIMAGES/2-19/1e6_crop_auto.JPG",  "conc": 1e6},
+    # {"file": "LFAIMAGES/2-19/1e9_crop_auto.JPG",  "conc": 1e9}
 ]
 
 # ── 2. Run analysis on every image ────────────────────────────────────────────
@@ -81,6 +97,65 @@ all_ris   = np.array([
 ], dtype=float)
 
 ax.scatter(all_concs, all_ris, s=80, color="steelblue", zorder=3, edgecolors="white", linewidths=0.8)
+
+
+
+
+# HIGHLIGHT_FILES = [
+#     "LFAIMAGES/50_fold_manual_2.jpeg",
+#     "LFAIMAGES/75_fold_manual_1.jpeg",
+#     "LFAIMAGES/image2-25folds.jpeg",
+#     "LFAIMAGES/image3-50fold.jpeg",
+#     "LFAIMAGES/image4-10fold.jpeg",
+#     "LFAIMAGES/image5-50fold2.jpeg",
+#     "LFAIMAGES/image6-10fold2.jpeg",
+#     "LFAIMAGES/image7-75fold.jpeg",
+#     "LFAIMAGES/image8-25fold2.jpeg",
+#     "LFAIMAGES/image9-75fold2.jpeg",
+# ]
+
+# # ── 4. Plot ───────────────────────────────────────────────────────────────────
+# fig, ax = plt.subplots(figsize=(8, 5))
+
+# all_concs = np.array([r["conc"] for r in records], dtype=float)
+# all_ris   = np.array([
+#     r["relative_intensity"] if r["relative_intensity"] is not None else 0.0
+#     for r in records
+# ], dtype=float)
+
+# # Color only the manually selected files
+# point_colors = [
+#     "red" if r["file"] in HIGHLIGHT_FILES else "steelblue"
+#     for r in records
+# ]
+
+# ax.scatter(
+#     all_concs,
+#     all_ris,
+#     s=80,
+#     c=point_colors,
+#     zorder=3,
+#     edgecolors="white",
+#     linewidths=0.8,
+# )
+
+# # Optional: add a legend
+# from matplotlib.lines import Line2D
+# legend_elements = [
+#     Line2D([0], [0], marker='o', linestyle='None', markerfacecolor='red',
+#            markeredgecolor='white', markersize=8, label='Highlighted samples'),
+#     Line2D([0], [0], marker='o', linestyle='None', markerfacecolor='steelblue',
+#            markeredgecolor='white', markersize=8, label='Other samples'),
+# ]
+# ax.legend(handles=legend_elements, fontsize=10)
+
+
+
+
+
+
+
+
 
 # ── Curve fit ────────────────────────────────────────────────────────────────
 fit_records = [r for r in records if r["conc"] > 0 and r["relative_intensity"] is not None]

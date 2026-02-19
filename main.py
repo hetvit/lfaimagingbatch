@@ -2,9 +2,12 @@ from lfa import SimpleLFAAnalyzer
 from lfa.analysis import run_analysis
 
 def main():
+    # img_path = 'LFAIMAGES/50_fold_manual_1.jpg'
     # img_path = 'LFAIMAGES/image3-50fold.jpeg'
-    img_path = 'LFAIMAGES/image1neg.jpeg'
+    # img_path = 'LFAIMAGES/SP-2-18/3e6_crop.jpg'
     # img_path = 'LFAIMAGES/image9-75fold2.jpeg'
+    # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
+    img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
     an = SimpleLFAAnalyzer(img_path)
 
 

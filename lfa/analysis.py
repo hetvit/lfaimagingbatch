@@ -1,9 +1,9 @@
 # lfa/analysis.py
 from pathlib import Path
-from . import image_processing_OLD as ip
+from . import image_processing as ip
 
 
-def run_analysis(an, ksize=71, denoise=False, k=5.0, debug_plots=True):
+def run_analysis(an, bg="morph", ksize=71, normalize=False, denoise=False, binarize_mode="rowwise", k=5.0, debug_plots=True):
     """
     Run the full rowwise LFA pipeline.
 
@@ -28,17 +28,18 @@ def run_analysis(an, ksize=71, denoise=False, k=5.0, debug_plots=True):
     ip.preprocess(an)
 
     # 2) Background subtraction
-    ip.subtract_background(an, ksize=ksize, denoise=denoise)
+    ip.subtract_background(an, method="morph", ksize=ksize, normalize=normalize, denoise=denoise)
 
     # 3) Rowwise binarization
-    ip.rowwise_binarize_corrected(
-        an,
-        stat="median",
-        smooth_ksize=51,
-        k=k,
-        min_run=5,
-        expand=2,
-    )
+    if binarize_mode:
+        ip.rowwise_binarize_corrected(
+            an,
+            stat="median",
+            smooth_ksize=51,
+            k=k,
+            min_run=5,
+            expand=2,
+        )
 
     if debug_plots:
         from .visualization import plot_rowwise_threshold_debug
