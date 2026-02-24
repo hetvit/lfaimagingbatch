@@ -201,6 +201,35 @@ def _keep_true_runs(hits, min_run=3):
     return out
 
 
+def _prune_weak_runs(hits, resid, sigma, min_peak_sigma=2.0):
+    """
+    Remove contiguous True runs whose maximum residual is too small.
+
+    hits  : (H,) bool
+    resid : (H,) float, row_score - baseline
+    sigma : float, robust noise scale from detect_band_rows
+    min_peak_sigma : float, minimum peak height in units of sigma
+                     (e.g. 2.0 → require peak >= 2σ)
+
+    Returns
+    -------
+    pruned_hits : (H,) bool
+    """
+    hits = hits.astype(bool)
+    H = len(hits)
+    keep = np.zeros(H, dtype=bool)
+
+    runs = _runs_from_hits(hits)
+    if sigma <= 0 or not runs:
+        return hits  # nothing to prune safely
+
+    for (s, e) in runs:
+        peak = float(np.max(resid[s:e+1]))
+        if peak >= min_peak_sigma * sigma:
+            keep[s:e+1] = True
+
+    return keep
+
 def _expand_rows(hits, radius=2):
     """
     Expand True rows by +/- radius using 1D dilation.
@@ -269,7 +298,7 @@ def _runs_from_hits(hits: np.ndarray):
 
 #     return kept
 
-def keep_best_run_per_half(hits, resid, mid, score_mode="auc", edge_margin_rows=5):
+def keep_best_run_per_half(hits, resid, mid, score_mode="auc", edge_margin_rows=10):
     """
     Select the best run in the top half and the best run in the bottom half.
 
@@ -303,6 +332,7 @@ def keep_best_run_per_half(hits, resid, mid, score_mode="auc", edge_margin_rows=
             return True
         return False
 
+    # split runs into top / bottom halves
     top_runs = []
     bot_runs = []
     for (s, e) in runs:
@@ -316,9 +346,9 @@ def keep_best_run_per_half(hits, resid, mid, score_mode="auc", edge_margin_rows=
 
     def select_best(runs_half):
         """
-        Given a list of (s,e) runs all in one half, return the best run
-        preferring non-edge runs.
-        If there are no non-edge runs, return None (i.e., no band in this half).
+        Given runs in one half:
+          1) pick best non-edge run (by score),
+          2) if none exist, pick best *edge* run instead.
         """
         if not runs_half:
             return None
@@ -334,17 +364,29 @@ def keep_best_run_per_half(hits, resid, mid, score_mode="auc", edge_margin_rows=
 
         # all runs in this half are edge runs -> treat as "no band"
         return None
+        
+        # THIS VERSION WILL CHECK IF EDGE, AND IF SO, KEEP THE HIGHEST AUC NON-EDGE BAND
+        # # 1) Prefer non-edge runs
+        # for score, s, e in scored:
+        #     if not is_edge_run(s, e):
+        #         return (s, e)
 
-    # Select run with greatest score in top/bottom halves, avoiding edges when possible
+        # # 2) All runs here are edge runs → keep the best one
+        # _, s_best, e_best = scored[0]
+        # return (s_best, e_best)
+
+    # keep strongest run in top half
     best_top = select_best(top_runs)
     if best_top is not None:
         s, e = best_top
         kept[s:e+1] = True
 
+    # keep strongest run in bottom half
     best_bot = select_best(bot_runs)
     if best_bot is not None:
         s, e = best_bot
         kept[s:e+1] = True
+
 
     return kept
 
@@ -353,7 +395,7 @@ def detect_band_rows(
     img,
     stat="mean",
     smooth_ksize=51,
-    exclude_center_frac=0.0, # remove this feature cuz it's wrong
+    exclude_center_frac_OLD=0.0, # remove this feature cuz it's wrong
     k=4.0,
 ):
     """
@@ -397,7 +439,7 @@ def detect_band_rows(
 
     # # Exclude center rows from noise estimation -> but this does it at the center... which might be wrong?
     center = h // 2
-    band = int(exclude_center_frac * h)
+    band = int(exclude_center_frac_OLD * h)
     mask_rows = np.ones(h, dtype=bool)
     mask_rows[max(0, center - band // 2):min(h, center + band // 2)] = False
 
@@ -428,6 +470,7 @@ def rowwise_binarize_corrected(
     invert_mask=False,
     keep_top_bands=2,          # keep only top 2 brighest continguous peaks
     band_score_mode="auc",     # "auc" or "peak"
+    min_peak_sigma=2.0,
 ):
     """
     ROW-WISE thresholding: each row is either ON (255 across entire width) or OFF.
@@ -447,15 +490,29 @@ def rowwise_binarize_corrected(
         img,
         stat=stat,
         smooth_ksize=smooth_ksize,
-        exclude_center_frac=exclude_center_frac,
+        # exclude_center_frac_OLD=exclude_center_frac, #not using this feature!
         k=k,
     )
     resid = row_score - baseline
+
+    # forbid any hits in the center fraction of rows (ignore center 10% as signal)
+    if exclude_center_frac and exclude_center_frac > 0.0:
+        H = row_hits.shape[0]
+        band = int(exclude_center_frac * H)
+        if band > 0:
+            center = H // 2
+            c0 = max(0, center - band // 2)
+            c1 = min(H, center + band // 2)
+            row_hits[c0:c1] = False   # center band cannot be "on"
 
     # --- keep only long-enough contiguous runs (remove isolated hit rows) ---
     hits = row_hits.copy()
     if min_run and min_run > 1:
         hits = _keep_true_runs(hits, min_run=min_run)
+
+     # drop weak runs whose peak residual is too small ---
+    if min_peak_sigma is not None and min_peak_sigma > 0 and sigma > 0:
+        hits = _prune_weak_runs(hits, resid, sigma, min_peak_sigma=min_peak_sigma)
 
     # --- keep only top-N bands (top peaks) --- -> THIS IS BETTER
     if keep_top_bands is not None and keep_top_bands > 0:
@@ -855,60 +912,127 @@ def estimate_background_percentile_mask(
     return background_value, mask
 
 
-def auto_crop_remove_dark_edges(an, dark_thresh=200, tol_frac=0.02, min_size=20):
+def auto_crop_remove_bright_edges(
+    an,
+    bright_delta=30,      # how much brighter than center to consider "too bright"
+    center_frac=0.3,      # fraction of width/height used for center region
+    tol_frac=0.01,        # fraction of pixels on an edge that must be too bright to crop
+    min_size=20           # minimum allowed height/width
+):
     """
-    Remove dark artifacts touching image edges.
+    Remove bright artifacts touching image edges *after inversion*.
 
-    dark_thresh:
-        Pixel value BELOW this is considered dark.
-    tol_frac:
-        Fraction of dark pixels required in a row/col to trim it.
-        (0.02 = 2% dark pixels)
-    min_size:
-        Minimum remaining height/width allowed after cropping (safety).
+    Logic:
+      - Work on an.inverted_image (bright bands, bright artifacts).
+      - Compute a "center brightness" from a central window.
+      - If any edge row/column has a fraction `tol_frac` of pixels that are
+        > center_brightness + bright_delta, trim ONE row/column from that side.
+      - Repeat until no edges are too bright or we hit min_size.
+
+    Crops:
+      - original_image
+      - inverted_image
+      - gray_image, corrected_image, background_image, binary_mask
+        (if present and matching the same shape)
     """
-    img = an.original_image
-    if img is None or img.size == 0:
-        raise ValueError("original_image is empty (cv2.imread likely failed or prior crop went wrong).")
+    if an.inverted_image is None:
+        raise ValueError("Run preprocess() first to set an.inverted_image.")
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    h, w = gray.shape
+    inv = an.inverted_image
+    if inv.ndim != 2:
+        raise ValueError("an.inverted_image must be single-channel (grayscale).")
 
-    top, bottom = 0, h - 1
-    left, right = 0, w - 1
+    H, W = inv.shape
+    top, bottom = 0, H - 1
+    left, right = 0, W - 1
 
-    # # ---- TOP ----
-    # while top < bottom and (bottom - top + 1) > min_size:
-    #     if np.mean(gray[top, :] < dark_thresh) >= tol_frac:
-    #         top += 1
-    #     else:
-    #         break
+    def current_subimage():
+        return inv[top:bottom+1, left:right+1]
 
-    # # ---- BOTTOM ----
-    # while bottom > top and (bottom - top + 1) > min_size:
-    #     if np.mean(gray[bottom, :] < dark_thresh) >= tol_frac:
-    #         bottom -= 1
-    #     else:
-    #         break
+    def compute_center_brightness(sub):
+        h, w = sub.shape
+        ch = max(1, int(center_frac * h))
+        cw = max(1, int(center_frac * w))
 
-    # ---- LEFT ----
-    while left < right and (right - left + 1) > min_size:
-        if np.mean(gray[:, left] < dark_thresh) >= tol_frac:
+        r0 = (h - ch) // 2
+        c0 = (w - cw) // 2
+        r1 = r0 + ch
+        c1 = c0 + cw
+
+        center_region = sub[r0:r1, c0:c1]
+        return float(np.median(center_region))
+
+    def edge_too_bright(sub, center_val):
+        h, w = sub.shape
+        thr = center_val + bright_delta
+
+        # Fraction of "too bright" pixels in each edge row/column
+        top_frac = np.mean(sub[0, :] > thr)
+        bot_frac = np.mean(sub[h-1, :] > thr)
+        left_frac = np.mean(sub[:, 0] > thr)
+        right_frac = np.mean(sub[:, w-1] > thr)
+
+        return {
+            "top": top_frac >= tol_frac,
+            "bottom": bot_frac >= tol_frac,
+            "left": left_frac >= tol_frac,
+            "right": right_frac >= tol_frac,
+        }
+
+    changed = True
+    while changed:
+        changed = False
+
+        # Safety: stop if we're about to go below min size
+        h_cur = bottom - top + 1
+        w_cur = right - left + 1
+        if h_cur <= min_size or w_cur <= min_size:
+            break
+
+        sub = current_subimage()
+        center_val = compute_center_brightness(sub)
+        flags = edge_too_bright(sub, center_val)
+
+        # Try to crop at most one row/col per edge per iteration,
+        # respecting min_size.
+        if flags["top"] and h_cur > min_size:
+            top += 1
+            changed = True
+
+        # recompute size after each potential crop
+        h_cur = bottom - top + 1
+        if flags["bottom"] and h_cur > min_size:
+            bottom -= 1
+            changed = True
+
+        w_cur = right - left + 1
+        if flags["left"] and w_cur > min_size:
             left += 1
-        else:
-            break
+            changed = True
 
-    # ---- RIGHT ----
-    while right > left and (right - left + 1) > min_size:
-        if np.mean(gray[:, right] < dark_thresh) >= tol_frac:
+        w_cur = right - left + 1
+        if flags["right"] and w_cur > min_size:
             right -= 1
-        else:
-            break
+            changed = True
 
-    cropped = img[top:bottom+1, left:right+1]
-    if cropped.size == 0:
-        # Safety fallback: do nothing
-        return (0, h - 1, 0, w - 1)
+    # Final safety: if something went wrong and crop is degenerate, bail out
+    if top > bottom or left > right:
+        return (0, H - 1, 0, W - 1)
 
-    an.original_image = cropped
+    # Apply crop to inverted and original and any aligned derivatives
+    def maybe_crop_attr(name):
+        if hasattr(an, name):
+            img = getattr(an, name)
+            if img is not None and img.size > 0:
+                # Only crop if shape matches original inverted shape
+                if img.shape[:2] == (H, W):
+                    setattr(an, name, img[top:bottom+1, left:right+1])
+
+    maybe_crop_attr("original_image")
+    maybe_crop_attr("inverted_image")
+    maybe_crop_attr("gray_image")
+    maybe_crop_attr("corrected_image")
+    maybe_crop_attr("background_image")
+    maybe_crop_attr("binary_mask")
+
     return (top, bottom, left, right)

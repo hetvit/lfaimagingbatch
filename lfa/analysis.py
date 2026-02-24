@@ -28,6 +28,9 @@ def run_analysis(an, bg="morph", ksize=51, k=5.0, smooth_ksize=51, normalize=Fal
 
     # 1) Preprocess
     ip.preprocess(an) # DONE
+    
+    # Iteratively trims edges that are bright from poor cropping
+    ip.auto_crop_remove_bright_edges(an, bright_delta=80, center_frac=0.9, tol_frac=0.25, min_size=40)
 
     # 2) Background subtraction
     ip.subtract_background(an, method=bg, ksize=ksize, normalize=normalize, denoise=denoise)
@@ -36,11 +39,13 @@ def run_analysis(an, bg="morph", ksize=51, k=5.0, smooth_ksize=51, normalize=Fal
     if binarize_mode:
         ip.rowwise_binarize_corrected(
             an,
-            stat="median",
+            stat="mean",
             smooth_ksize=smooth_ksize,
+            exclude_center_frac=0.20, # how much from the center to exclude
             k=k, # this is how man SD above the background to binarize
-            min_run=5,
+            min_run=8,
             expand=2,
+            min_peak_sigma=0.0,
         )
 
     if debug_plots:

@@ -18,8 +18,8 @@ def main():
         an,
         bg='morph',
         ksize=51,
-        k=4.0, # this is how many SD above is a band
-        smooth_ksize=81, # 1d median filter smoothing
+        k=1.5, # this is how many SD above is a band
+        smooth_ksize=91, # 1d median filter smoothing
         normalize=False,
         denoise=False,
         binarize_mode="rowwise",
@@ -43,18 +43,20 @@ def main():
     # an.visualize(save_path=None)
 
     
-    
+    ###########################################
     # DEBUG/IMAGE VISUALIZATION
-    # Preprocess
+    ###########################################
+    
+    # Preprocess Visual
     # show_preprocessing_steps(img_path)
     
-    #BG Subtraction
+    #BG Subtraction Visual
     # visualize_background_subtraction(img_path, method="morph", ksize=51, normalize=False, denoise=False, colormode="gray")
 
     # visualize_background_subtraction(img_path, method="morph", ksize=51, normalize=False, denoise=False, colormode="hot")
     
     
-    #Rowwise Thresholding
+    #Rowwise Thresholding Visual
     # visualize_rowwise_thresholding(
     #     img_path,
     #     stat="mean",

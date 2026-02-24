@@ -17,30 +17,31 @@ def four_pl(x, bottom, top, ec50, hill):
 
 # ── 1. Sample manifest ────────────────────────────────────────────────────────
 SAMPLES = [
-    {"file": "LFAIMAGES/original/50_fold_manual_1.jpeg",  "conc": 6e3},
-    {"file": "LFAIMAGES/original/50_fold_manual_2.jpeg",  "conc": 6e3},
-    {"file": "LFAIMAGES/original/75_fold_manual_1.jpeg",  "conc": 4e3},
-    {"file": "LFAIMAGES/original/image2-25folds.jpeg",  "conc": 1.2e4},
-    {"file": "LFAIMAGES/original/image3-50fold.jpeg",  "conc": 6e3},
-    {"file": "LFAIMAGES/original/image4-10fold.jpeg",  "conc": 3e4},
-    {"file": "LFAIMAGES/original/image5-50fold2.jpeg",  "conc": 6e3},
-    {"file": "LFAIMAGES/original/image6-10fold2.jpeg",  "conc": 3e4},
-    {"file": "LFAIMAGES/original/image7-75fold.jpeg",  "conc": 4e3},
-    {"file": "LFAIMAGES/original/image8-25fold2.jpeg",  "conc": 1.2e4},
-    {"file": "LFAIMAGES/original/image9-75fold2.jpeg",  "conc": 4e3},
+    {"file": "LFAIMAGES/original/image1neg_COPY.jpeg",  "conc": 0}, # -> not detected -> CROPPED POORLY
+    {"file": "LFAIMAGES/original/50_fold_manual_1.jpeg",  "conc": 6e3}, # -> detected
+    {"file": "LFAIMAGES/original/50_fold_manual_2.jpeg",  "conc": 6e3}, # -> detected
+    {"file": "LFAIMAGES/original/75_fold_manual_1.jpeg",  "conc": 4e3}, # -> not detected
+    {"file": "LFAIMAGES/original/image2-25folds_COPY.jpeg",  "conc": 1.2e4}, # -> detected
+    {"file": "LFAIMAGES/original/image3-50fold_COPY.jpeg",  "conc": 6e3}, # -> detected
+    {"file": "LFAIMAGES/original/image4-10fold_COPY.jpeg",  "conc": 3e4}, # -> detected
+    {"file": "LFAIMAGES/original/image5-50fold2_COPY.jpeg",  "conc": 6e3}, # -> BARELY DETECTED
+    {"file": "LFAIMAGES/original/image6-10fold2_COPY.jpeg",  "conc": 3e4}, # -> detected
+    {"file": "LFAIMAGES/original/image7-75fold_COPY.jpeg",  "conc": 4e3}, # -> not detected -> DETECTED IF USING MEDIAN INSTEAD OF MEAN
+    {"file": "LFAIMAGES/original/image8-25fold2_COPY.jpeg",  "conc": 1.2e4}, # -> detected
+    {"file": "LFAIMAGES/original/image9-75fold2_COPY.jpeg",  "conc": 4e3}, # -> DETECTED
     
     
     # # 2-19 SP
-    # {"file": "LFAIMAGES/SP 2-19/SP_1e5.png",  "conc": 1e5},
-    # {"file": "LFAIMAGES/SP 2-19/SP_3e5.png",  "conc": 3e5},
-    # {"file": "LFAIMAGES/SP 2-19/SP_1e6.png",  "conc": 1e6},
-    # {"file": "LFAIMAGES/SP 2-19/SP_3e6.png",  "conc": 3e6},
-    # {"file": "LFAIMAGES/SP 2-19/SP_1e7.png",  "conc": 1e7},
-    # {"file": "LFAIMAGES/SP 2-19/SP_neg.png",  "conc": 0},
+    # {"file": "LFAIMAGES/SP 2-19/SP_1e5.png",  "conc": 1e5}, # -> not detected
+    # {"file": "LFAIMAGES/SP 2-19/SP_3e5.png",  "conc": 3e5}, # -> detected
+    # {"file": "LFAIMAGES/SP 2-19/SP_1e6.png",  "conc": 1e6}, # -> detected
+    # {"file": "LFAIMAGES/SP 2-19/SP_3e6.png",  "conc": 3e6}, # -> detected
+    # {"file": "LFAIMAGES/SP 2-19/SP_1e7.png",  "conc": 1e7}, # -> detected
+    # {"file": "LFAIMAGES/SP 2-19/SP_neg.png",  "conc": 0}, # -> detected...
     
     
     # # 2-18 SP
-    # {"file": "LFAIMAGES/SP-2-18/1e5_crop.jpg",  "conc": 1e5},
+    # {"file": "LFAIMAGES/SP-2-18/1e5_crop.jpg",  "conc": 1e5}, # -> not detected, rest are...
     # {"file": "LFAIMAGES/SP-2-18/1e6_crop.jpg",  "conc": 1e6},
     # {"file": "LFAIMAGES/SP-2-18/3e6_crop.jpg",  "conc": 3e6},
     # {"file": "LFAIMAGES/SP-2-18/1e7_crop.jpg",  "conc": 1e7},
@@ -72,8 +73,8 @@ for s in SAMPLES:
             an,
             bg='morph',
             ksize=51,
-            k=4.0, # this is how many SD above is a band
-            smooth_ksize=71, # 1d median filter smoothing
+            k=1.5, # this is how many SD above is a band
+            smooth_ksize=91, # 1d median filter smoothing
             normalize=False,
             denoise=False,
             binarize_mode="rowwise",
