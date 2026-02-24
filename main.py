@@ -4,7 +4,7 @@ from lfa.utils import show_preprocessing_steps, visualize_background_subtraction
 
 def main():
     # img_path = 'LFAIMAGES/standard 2-20/no atps 1 REAL.JPG'
-    img_path = 'LFAIMAGES/standard 2-20/3e5 + no atps 2.JPG'
+    img_path = "LFAIMAGES/02-24 device_flashmoved/democrop.PNG"
     # img_path = 'LFAIMAGES/75_fold_manual_1.jpeg'
     # # img_path = 'LFAIMAGES/image3-50fold.jpeg'
     # # img_path = 'LFAIMAGES/SP-2-18/3e6_crop.jpg'
@@ -23,12 +23,12 @@ def main():
         normalize=False,
         denoise=False,
         binarize_mode="rowwise",
-        # debug_plots=True,
+        debug_plots=True,
     )
 
-    # print("\nReturned results dict:")
-    # # print(results)
-    # print_analysis_report(results)
+    print("\nReturned results dict:")
+    print(results)
+    print_analysis_report(results)
 
     from lfa.visualization import plot_inverted_vs_corrected
     plot_inverted_vs_corrected(an)
