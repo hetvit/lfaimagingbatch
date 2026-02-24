@@ -1,40 +1,74 @@
 from lfa import SimpleLFAAnalyzer
 from lfa.analysis import run_analysis
+from lfa.utils import show_preprocessing_steps, visualize_background_subtraction, visualize_rowwise_thresholding
 
 def main():
-    # img_path = 'LFAIMAGES/50_fold_manual_1.jpg'
-    # img_path = 'LFAIMAGES/image3-50fold.jpeg'
-    # img_path = 'LFAIMAGES/SP-2-18/3e6_crop.jpg'
+    # img_path = 'LFAIMAGES/standard 2-20/no atps 1 REAL.JPG'
+    img_path = 'LFAIMAGES/standard 2-20/3e5 + no atps 2.JPG'
+    # img_path = 'LFAIMAGES/75_fold_manual_1.jpeg'
+    # # img_path = 'LFAIMAGES/image3-50fold.jpeg'
+    # # img_path = 'LFAIMAGES/SP-2-18/3e6_crop.jpg'
     # img_path = 'LFAIMAGES/image9-75fold2.jpeg'
-    # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
-    img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
+    # # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
+    # # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
     an = SimpleLFAAnalyzer(img_path)
 
-
-    # use package analysis function (not an.analyze())
+    # use package analysis function
     results = run_analysis(
-    an,
-    ksize=71,
-    k=5.0,
-    denoise=False,
-    debug_plots=True,
+        an,
+        bg='morph',
+        ksize=51,
+        k=4.0, # this is how many SD above is a band
+        smooth_ksize=81, # 1d median filter smoothing
+        normalize=False,
+        denoise=False,
+        binarize_mode="rowwise",
+        # debug_plots=True,
     )
 
-    print("\nReturned results dict:")
-    # print(results)
-    print_analysis_report(results)
+    # print("\nReturned results dict:")
+    # # print(results)
+    # print_analysis_report(results)
 
     from lfa.visualization import plot_inverted_vs_corrected
     plot_inverted_vs_corrected(an)
     
-    try:
-        from lfa.visualization import plot_rowwise_threshold_debug
-        # plot_rowwise_threshold_debug(an)  # uses an.corrected_image, an.binary_mask, an._rowwise_debug
-    except Exception as e:
-        print(f"(Skipping extra debug plot: {e})")
+    # try:
+    #     from lfa.visualization import plot_rowwise_threshold_debug
+    #     plot_rowwise_threshold_debug(an)  # uses an.corrected_image, an.binary_mask, an._rowwise_debug
+    # except Exception as e:
+    #     print(f"(Skipping extra debug plot: {e})")
 
-    # Your 2-panel + extra WL figure
-    an.visualize(save_path=None)
+    # # Your 2-panel + extra WL figure
+    # an.visualize(save_path=None)
+
+    
+    
+    # DEBUG/IMAGE VISUALIZATION
+    # Preprocess
+    # show_preprocessing_steps(img_path)
+    
+    #BG Subtraction
+    # visualize_background_subtraction(img_path, method="morph", ksize=51, normalize=False, denoise=False, colormode="gray")
+
+    # visualize_background_subtraction(img_path, method="morph", ksize=51, normalize=False, denoise=False, colormode="hot")
+    
+    
+    #Rowwise Thresholding
+    # visualize_rowwise_thresholding(
+    #     img_path,
+    #     stat="mean",
+    #     smooth_ksize=81,
+    #     k=3.0,
+    #     exclude_center_frac=0.0,
+    #     min_run=3,
+    #     expand=2,
+    #     keep_top_bands=2,
+    #     band_score_mode="auc",
+    #     colormode="hot"
+    # )
+
+    return
 
 def print_analysis_report(results):
     """
@@ -82,6 +116,8 @@ def print_analysis_report(results):
         print("Relative Intensity:  N/A")
 
     print("=" * 60 + "\n")
+
+
 
 
 if __name__ == "__main__":

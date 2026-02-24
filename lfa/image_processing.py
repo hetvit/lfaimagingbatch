@@ -215,6 +215,7 @@ def _expand_rows(hits, radius=2):
 def _runs_from_hits(hits: np.ndarray):
     """
     Convert boolean hits (H,) into list of (start, end) inclusive indices for True-runs.
+    ex. [False, True, True, True, False, False, True, True, False, ...] -> [(1, 3), (6, 7)] (continuous true intervals)
     """
     hits = hits.astype(bool)
     runs = []
@@ -268,11 +269,21 @@ def _runs_from_hits(hits: np.ndarray):
 
 #     return kept
 
-def keep_best_run_per_half(hits, resid, mid, score_mode="auc"):
-    runs = _runs_from_hits(hits)
+def keep_best_run_per_half(hits, resid, mid, score_mode="auc", edge_margin_rows=5):
+    """
+    Select the best run in the top half and the best run in the bottom half.
+
+    We prefer runs that do NOT touch the top/bottom edges (within
+    `edge_margin_rows`), but if a half only has edge runs, we still keep
+    the best one there so we don't drop the band entirely.
+    """
+    runs = _runs_from_hits(hits) #converts hits, an array of booleans for each row, to an array with intervals of True
     if not runs:
         return hits
+    
+    H = len(hits)
 
+    # Scoring function: AUC accounts for band width; peak is only highest score mattering
     def score_run(s, e):
         r = resid[s:e+1]
         if score_mode == "auc":
@@ -282,21 +293,58 @@ def keep_best_run_per_half(hits, resid, mid, score_mode="auc"):
         else:
             raise ValueError("score_mode must be 'auc' or 'peak'")
 
-    top = []
-    bot = []
+    def is_edge_run(s, e):
+        """True if the run touches top or bottom ~edge_margin_rows pixels."""
+        # touches rows 0..edge_margin_rows-1
+        if s <= edge_margin_rows - 1:
+            return True
+        # touches rows H-edge_margin_rows .. H-1
+        if e >= H - edge_margin_rows:
+            return True
+        return False
+
+    top_runs = []
+    bot_runs = []
     for (s, e) in runs:
-        center = 0.5 * (s + e)
-        (top if center < mid else bot).append((s, e))
+        center = 0.5 * (s + e) # center row
+        if center < mid:
+            top_runs.append((s, e))
+        else:
+            bot_runs.append((s, e))
 
     kept = np.zeros_like(hits, dtype=bool)
 
-    if top:
-        best = max(top, key=lambda r: score_run(*r))
-        kept[best[0]:best[1]+1] = True
+    def select_best(runs_half):
+        """
+        Given a list of (s,e) runs all in one half, return the best run
+        preferring non-edge runs.
+        If there are no non-edge runs, return None (i.e., no band in this half).
+        """
+        if not runs_half:
+            return None
 
-    if bot:
-        best = max(bot, key=lambda r: score_run(*r))
-        kept[best[0]:best[1]+1] = True
+        # score all runs
+        scored = [(score_run(s, e), s, e) for (s, e) in runs_half]
+        scored.sort(reverse=True, key=lambda t: t[0])  # high score first
+
+        # only keep non-edge runs; ignore edge-only halves
+        for score, s, e in scored:
+            if not is_edge_run(s, e):
+                return (s, e)
+
+        # all runs in this half are edge runs -> treat as "no band"
+        return None
+
+    # Select run with greatest score in top/bottom halves, avoiding edges when possible
+    best_top = select_best(top_runs)
+    if best_top is not None:
+        s, e = best_top
+        kept[s:e+1] = True
+
+    best_bot = select_best(bot_runs)
+    if best_bot is not None:
+        s, e = best_bot
+        kept[s:e+1] = True
 
     return kept
 
@@ -327,7 +375,7 @@ def detect_band_rows(
     peak_row  : int
     sigma     : float
     """
-    img = img.astype(np.float32)
+    img = img.astype(np.float64)
 
     # Row statistic -> get a 1D intensity signal from 2D image, a single value for each row of the image -> vertical intensity profile
     if stat == "mean":
@@ -341,11 +389,13 @@ def detect_band_rows(
 
     # Smooth row_score to get a drift baseline -> large-window median filter on row signal, removing narrow peaks but keeps slow trends, smooths out row_score
     baseline = _median_filter_1d(row_score, smooth_ksize)
+    
+    # print(list(baseline))
 
     # Robust sigma from residuals on "background rows" -> bands have positive residuals, normalizing. Isolate extra brightness beyond background
     resid = row_score - baseline
 
-    # Exclude center rows from noise estimation -> but this does it at the center... which might be wrong?
+    # # Exclude center rows from noise estimation -> but this does it at the center... which might be wrong?
     center = h // 2
     band = int(exclude_center_frac * h)
     mask_rows = np.ones(h, dtype=bool)
@@ -356,10 +406,12 @@ def detect_band_rows(
     med = np.median(bg_resid)
     mad = np.median(np.abs(bg_resid - med)) + 1e-6
     sigma = 1.4826 * mad # estimate SD from MAD if noise is roughly normal
-
-    # Per-row threshold -> threshold for each row -> z-score test -> 
+    
+    # Per-row threshold -> threshold for each row -> z-score test
     T_row = baseline + float(k) * float(sigma) # create threshold for each row -> band is a line row if > baseline + (k * sigma brighter than expected)
+    # print(list(T_row))
     row_hits = row_score > T_row # apply threshold
+    # print(f"ROW HITS: {np.sum(row_hits)}")
     peak_row = int(np.argmax(row_score)) # find the single strongest row peak
 
     return row_score, baseline, T_row, row_hits, peak_row, float(sigma)
@@ -367,7 +419,7 @@ def detect_band_rows(
 
 def rowwise_binarize_corrected(
     an,
-    stat="median",
+    stat="mean",
     smooth_ksize=51,
     exclude_center_frac=0.00, # set to 0
     k=4.0,
@@ -375,7 +427,7 @@ def rowwise_binarize_corrected(
     expand=2,               # expand hits by +/- expand rows (thicken band)
     invert_mask=False,
     keep_top_bands=2,          # keep only top 2 brighest continguous peaks
-    band_score_mode="auc",     # NEW: "auc" (recommended) or "peak"
+    band_score_mode="auc",     # "auc" or "peak"
 ):
     """
     ROW-WISE thresholding: each row is either ON (255 across entire width) or OFF.
@@ -407,7 +459,6 @@ def rowwise_binarize_corrected(
 
     # --- keep only top-N bands (top peaks) --- -> THIS IS BETTER
     if keep_top_bands is not None and keep_top_bands > 0:
-        # Use helper from above (paste into your class or module)
         # hits = _keep_top_k_runs(hits, resid, k_runs=int(keep_top_bands), score_mode=band_score_mode)
         
         # NEW:
@@ -420,6 +471,11 @@ def rowwise_binarize_corrected(
     # --- expand vertically (optional) ---
     if expand and expand > 0:
         hits = _expand_rows(hits, radius=expand)
+
+    # NEW: disallow any hits in the top/bottom edge_margin_rows
+    edge_margin_rows = 5
+    hits[:edge_margin_rows] = False
+    hits[-edge_margin_rows:] = False
 
     # --- build ROW-WISE mask (entire row on/off) ---
     mask = (hits[:, None].astype(np.uint8) * 255)
@@ -451,12 +507,14 @@ def rowwise_binarize_corrected(
 
 ### CLASSIFICATION
 
-def classify_two_band_top_bottom(an, min_bands=1, max_bands=2):
+def classify_two_band_top_bottom(an, min_bands=1, max_bands=2, edge_margin_rows=5):
     """
     Classification based on detected rowwise True runs (bands):
       - POSITIVE: exactly 2 bands total: one in top half, one in bottom half
       - NEGATIVE: exactly 1 band total and it is in top half (control-only)
-      - INVALID: anything else (e.g., only bottom band, >2 bands, etc.)
+      - INVALID:
+            * anything else (e.g., only bottom band, >2 bands, etc.), or
+            * ANY band touches the top/bottom edge rows (within edge_margin_rows)
     """
     if not hasattr(an, "_rowwise_debug"):
         return {"status": "INVALID", "reason": "No rowwise debug info. Run rowwise_binarize_corrected() first."}
@@ -471,16 +529,43 @@ def classify_two_band_top_bottom(an, min_bands=1, max_bands=2):
         s, e = run
         return 0.5 * (s + e)
 
+    def is_edge_run(run):
+        """True if run touches the top or bottom edge within edge_margin_rows."""
+        s, e = run
+        # top region: rows [0 .. edge_margin_rows-1]
+        if s <= edge_margin_rows - 1:
+            return True
+        # bottom region: rows [H-edge_margin_rows .. H-1]
+        if e >= H - edge_margin_rows:
+            return True
+        return False
+
+    # invalidate if any band is on the edge
+    if any(is_edge_run(r) for r in runs):
+        return {
+            "status": "INVALID",
+            "runs": runs,
+            "top_runs": [],
+            "bottom_runs": [],
+            "mid_row": mid,
+            "num_bands": len(runs),
+            "reason": f"Band touches top/bottom {edge_margin_rows} rows.",
+        }
+
+
     top_runs = [r for r in runs if run_center(r) < mid]
     bot_runs = [r for r in runs if run_center(r) >= mid]
 
     # core logic
     if len(runs) == 2 and len(top_runs) == 1 and len(bot_runs) == 1:
         status = "POSITIVE"
+        reason = None
     elif len(runs) == 1 and len(top_runs) == 1 and len(bot_runs) == 0:
         status = "NEGATIVE"
+        reason = None
     else:
         status = "INVALID"
+        reason = "Band pattern not 1-top or 1-top+1-bottom."
 
     return {
         "status": status,
@@ -489,12 +574,22 @@ def classify_two_band_top_bottom(an, min_bands=1, max_bands=2):
         "bottom_runs": bot_runs,
         "mid_row": mid,
         "num_bands": len(runs),
+        "reason": reason,
     }
     
-def band_mean_intensity_on_original(an, run, half=None, edge_margin_frac=0.05):
+def band_mean_intensity_on_original(an, run, half=None, edge_margin_frac=0.01, row_radius=10):
     """
     Compute mean intensity in the ORIGINAL image for rows in `run` (s,e),
     but only using pixels away from left/right edges to avoid edge artifacts.
+
+    We first compute the center row of the run, then average over a fixed
+    vertical window: [center - row_radius, center + row_radius].
+    
+    If the band height (e - s + 1) is smaller than the standard window
+    height (2*row_radius + 1), we use the entire band.
+
+    This standardizes the band "height" used for intensity, so different
+    mask thicknesses don't change the measurement.
 
     We use grayscale ORIGINAL (not inverted).
     Lower value = darker/pinker band.
@@ -507,18 +602,100 @@ def band_mean_intensity_on_original(an, run, half=None, edge_margin_frac=0.05):
     H, W = gray.shape
     s, e = run
 
-    # clamp
-    s = max(0, int(s)); e = min(H - 1, int(e))
+    # clamp run bounds just in case
+    s = max(0, int(s))
+    e = min(H - 1, int(e))
     if e <= s:
         return float("nan")
+    
+    band_height = e - s + 1
+    target_height = 2 * row_radius + 1
 
+    # fixed-height window around center
+    if band_height <= target_height:
+        # Band is already smaller than our standard window → use entire band
+        s_win = s
+        e_win = e
+    else:
+        # Use fixed-height window around the band center
+        center_row = 0.5 * (s + e)
+        c = int(round(center_row))
+
+        s_win = max(0, c - row_radius)
+        e_win = min(H - 1, c + row_radius)
+
+        # (optional but safe: keep window within the run as well)
+        s_win = max(s_win, s)
+        e_win = min(e_win, e)
+    
+    # horizontal cropping to avoid edges
     edge = int(edge_margin_frac * W)
     x0 = edge
     x1 = W - edge
 
-    roi = gray[s:e+1, x0:x1]
+    roi = gray[s_win:e_win + 1, x0:x1] # includes height from s_fixed to e_fixed and width from left edge to right edge
+    if roi.size == 0:
+        return float("nan")
+    
     return float(np.mean(roi))
 
+
+def make_band_sampling_mask(
+    an,
+    run,
+    edge_margin_frac=0.01,
+    row_radius=10,
+):
+    """
+    Generate a binary mask (0/255) showing exactly which pixels are used
+    for computing band_mean_intensity_on_original().
+
+    This applies the same logic:
+      - If band height <= window height => use full band
+      - Else => use center ± row_radius
+      - Also applies edge cropping
+    """
+
+    gray = cv2.cvtColor(an.original_image, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    H, W = gray.shape
+    s, e = run
+
+    # Clamp bounds
+    s = max(0, int(s))
+    e = min(H - 1, int(e))
+    if e <= s:
+        mask = np.zeros((H, W), dtype=np.uint8)
+        return mask
+
+    band_height = e - s + 1
+    target_height = 2 * row_radius + 1
+
+    # --- choose window vertically ---
+    if band_height <= target_height:
+        # use entire band
+        s_win = s
+        e_win = e
+    else:
+        # fixed window around center
+        center_row = 0.5 * (s + e)
+        c = int(round(center_row))
+        s_win = max(0, c - row_radius)
+        e_win = min(H - 1, c + row_radius)
+
+        # restrict within actual band (safe)
+        s_win = max(s_win, s)
+        e_win = min(e_win, e)
+
+    # --- horizontal cropping ---
+    edge = int(edge_margin_frac * W)
+    x0 = max(0, edge)
+    x1 = min(W, W - edge)
+
+    # --- build mask ---
+    mask = np.zeros((H, W), dtype=np.uint8)
+    mask[s_win:e_win+1, x0:x1] = 255
+
+    return mask
 
 def compute_relative_intensity_from_runs(an, top_run, bottom_run):
     """
@@ -549,12 +726,12 @@ def compute_relative_intensity_from_runs(an, top_run, bottom_run):
     }
 
 
-def classify_one_band_top_only(an):
+def classify_one_band_top_only(an, edge_margin_rows=5):
     """
     Your requested rule:
       - POSITIVE if EXACTLY 1 band run detected AND it's in the TOP half
       - NEGATIVE otherwise (0 bands or >=2 bands)
-      - INVALID if exactly 1 band run but it's in the BOTTOM half (problem)
+      - INVALID if exactly 1 band run but it's in the BOTTOM half, OR if that band touches the top/bottom edge rows.
 
     Returns dict with status + runs.
     """
@@ -567,6 +744,25 @@ def classify_one_band_top_only(an):
 
     runs = _runs_from_hits(hits)
     n = len(runs)
+    
+    def is_edge_run(run):
+        s, e = run
+        if s <= edge_margin_rows - 1:
+            return True
+        if e >= H - edge_margin_rows:
+            return True
+        return False
+
+    # If any run touches edge, mark INVALID right away
+    if any(is_edge_run(r) for r in runs):
+        return {
+            "status": "INVALID",
+            "num_bands": n,
+            "runs": runs,
+            "mid_row": mid,
+            "problem_bottom_half_band": False,
+            "bad_runs": [r for r in runs if is_edge_run(r)],
+        }
 
     status = "NEGATIVE"
     problem = False
