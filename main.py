@@ -1,30 +1,36 @@
 from lfa import SimpleLFAAnalyzer
 from lfa.analysis import run_analysis
 from lfa.utils import show_preprocessing_steps, visualize_background_subtraction, visualize_rowwise_thresholding
+from __future__ import annotations
+from pathlib import Path
 
-def main():
-    # img_path = 'LFAIMAGES/standard 2-20/no atps 1 REAL.JPG'
-    img_path = "LFAIMAGES/02-24 device_flashmoved/democrop.PNG"
-    # img_path = 'LFAIMAGES/75_fold_manual_1.jpeg'
-    # # img_path = 'LFAIMAGES/image3-50fold.jpeg'
-    # # img_path = 'LFAIMAGES/SP-2-18/3e6_crop.jpg'
-    # img_path = 'LFAIMAGES/image9-75fold2.jpeg'
-    # # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
-    # # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
+def analyze_image(img_path: str):
+    """
+    Single source-of-truth pipeline entry point for both CLI (main.py)
+    and FastAPI (server.py).
+
+    Returns:
+        (results_dict, analyzer_instance)
+    """
     an = SimpleLFAAnalyzer(img_path)
 
-    # use package analysis function
     results = run_analysis(
         an,
-        bg='morph',
+        bg="morph",
         ksize=51,
-        k=1.5, # this is how many SD above is a band
-        smooth_ksize=91, # 1d median filter smoothing
+        k=1.5,
+        smooth_ksize=91,
         normalize=False,
         denoise=False,
         binarize_mode="rowwise",
-        debug_plots=True,
+        debug_plots=False,  # IMPORTANT: server is headless; don't generate show() plots
     )
+
+    return results, an
+def main():
+    img_path = "LFAIMAGES/02-24 device_flashmoved/democrop.PNG"
+
+    results, an = analyze_image(img_path, debug_plots=True)  # CLI only
 
     print("\nReturned results dict:")
     print(results)
