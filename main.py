@@ -1,7 +1,6 @@
 from lfa import SimpleLFAAnalyzer
 from lfa.analysis import run_analysis
 from lfa.utils import show_preprocessing_steps, visualize_background_subtraction, visualize_rowwise_thresholding
-from __future__ import annotations
 from pathlib import Path
 
 def analyze_image(img_path: str):
