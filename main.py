@@ -4,13 +4,13 @@ from lfa.utils import show_preprocessing_steps, visualize_background_subtraction
 
 def main():
     # img_path = 'LFAIMAGES/standard 2-20/no atps 1 REAL.JPG'
-    img_path = 'LFAIMAGES/standard 2-20/3e5 + no atps 2.JPG'
+    # img_path = 'LFAIMAGES/standard 2-20/3e5 + no atps 2.JPG'
     # img_path = 'LFAIMAGES/75_fold_manual_1.jpeg'
     # # img_path = 'LFAIMAGES/image3-50fold.jpeg'
     # # img_path = 'LFAIMAGES/SP-2-18/3e6_crop.jpg'
     # img_path = 'LFAIMAGES/image9-75fold2.jpeg'
-    # # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
-    # # img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
+    img_path = 'LFAIMAGES/2-19/1e6_crop_auto.JPG'
+    # img_path = 'LFAIMAGES/original/50_fold_manual_1.jpeg'
     an = SimpleLFAAnalyzer(img_path)
 
     # use package analysis function
@@ -25,13 +25,19 @@ def main():
         binarize_mode="rowwise",
         # debug_plots=True,
     )
+    
+    # --- NEW: generate the big 3-panel debug image for this strip ---
+    import cv2
+    from lfa.visualization import plot_lfa_final_panels
+    uncropped = cv2.imread("./1e6_precropped.jpg", cv2.IMREAD_COLOR)
+    plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=uncropped)
 
-    # print("\nReturned results dict:")
-    # # print(results)
+    print("\nReturned results dict:")
+    print(results)
     # print_analysis_report(results)
 
-    from lfa.visualization import plot_inverted_vs_corrected
-    plot_inverted_vs_corrected(an)
+    # from lfa.visualization import plot_inverted_vs_corrected
+    # plot_inverted_vs_corrected(an)
     
     # try:
     #     from lfa.visualization import plot_rowwise_threshold_debug
