@@ -17,18 +17,18 @@ def four_pl(x, bottom, top, ec50, hill):
 
 # ── 1. Sample manifest ────────────────────────────────────────────────────────
 SAMPLES = [
-    {"file": "LFAIMAGES/original/image1neg_COPY.jpeg",  "conc": 0}, # -> not detected -> CROPPED POORLY
-    {"file": "LFAIMAGES/original/50_fold_manual_1.jpeg",  "conc": 6e3}, # -> detected
-    {"file": "LFAIMAGES/original/50_fold_manual_2.jpeg",  "conc": 6e3}, # -> detected
-    {"file": "LFAIMAGES/original/75_fold_manual_1.jpeg",  "conc": 4e3}, # -> not detected
-    {"file": "LFAIMAGES/original/image2-25folds_COPY.jpeg",  "conc": 1.2e4}, # -> detected
-    {"file": "LFAIMAGES/original/image3-50fold_COPY.jpeg",  "conc": 6e3}, # -> detected
-    {"file": "LFAIMAGES/original/image4-10fold_COPY.jpeg",  "conc": 3e4}, # -> detected
-    {"file": "LFAIMAGES/original/image5-50fold2_COPY.jpeg",  "conc": 6e3}, # -> BARELY DETECTED
-    {"file": "LFAIMAGES/original/image6-10fold2_COPY.jpeg",  "conc": 3e4}, # -> detected
-    {"file": "LFAIMAGES/original/image7-75fold_COPY.jpeg",  "conc": 4e3}, # -> not detected -> DETECTED IF USING MEDIAN INSTEAD OF MEAN
-    {"file": "LFAIMAGES/original/image8-25fold2_COPY.jpeg",  "conc": 1.2e4}, # -> detected
-    {"file": "LFAIMAGES/original/image9-75fold2_COPY.jpeg",  "conc": 4e3}, # -> DETECTED
+    # {"file": "LFAIMAGES/original/image1neg_COPY.jpeg",  "conc": 0}, # -> not detected -> CROPPED POORLY
+    # {"file": "LFAIMAGES/original/50_fold_manual_1.jpeg",  "conc": 6e3}, # -> detected
+    # {"file": "LFAIMAGES/original/50_fold_manual_2.jpeg",  "conc": 6e3}, # -> detected
+    # {"file": "LFAIMAGES/original/75_fold_manual_1.jpeg",  "conc": 4e3}, # -> not detected
+    # {"file": "LFAIMAGES/original/image2-25folds_COPY.jpeg",  "conc": 1.2e4}, # -> detected
+    # {"file": "LFAIMAGES/original/image3-50fold_COPY.jpeg",  "conc": 6e3}, # -> detected
+    # {"file": "LFAIMAGES/original/image4-10fold_COPY.jpeg",  "conc": 3e4}, # -> detected
+    # {"file": "LFAIMAGES/original/image5-50fold2_COPY.jpeg",  "conc": 6e3}, # -> BARELY DETECTED
+    # {"file": "LFAIMAGES/original/image6-10fold2_COPY.jpeg",  "conc": 3e4}, # -> detected
+    # {"file": "LFAIMAGES/original/image7-75fold_COPY.jpeg",  "conc": 4e3}, # -> not detected -> DETECTED IF USING MEDIAN INSTEAD OF MEAN
+    # {"file": "LFAIMAGES/original/image8-25fold2_COPY.jpeg",  "conc": 1.2e4}, # -> detected
+    # {"file": "LFAIMAGES/original/image9-75fold2_COPY.jpeg",  "conc": 4e3}, # -> DETECTED
     
     
     # # 2-19 SP
@@ -47,7 +47,7 @@ SAMPLES = [
     # {"file": "LFAIMAGES/SP-2-18/1e7_crop.jpg",  "conc": 1e7},
     # {"file": "LFAIMAGES/SP-2-18/3e7_crop.jpg",  "conc": 3e7},
     # {"file": "LFAIMAGES/SP-2-18/1e8_crop.jpg",  "conc": 1e8},
-    # {"file": "LFAIMAGES/SP-2-18/3e8_crop_manual.jpg",  "conc": 3e8},
+    # # {"file": "LFAIMAGES/SP-2-18/3e8_crop_manual.jpg",  "conc": 3e8},
     
     # # 2-19
     # {"file": "LFAIMAGES/2-19/1e6_crop_auto.JPG",  "conc": 1e6},
@@ -60,6 +60,10 @@ SAMPLES = [
     # {"file": "LFAIMAGES/standard 2-20/3e5 + no atps 1.JPG",  "conc": 3e5},
     # {"file": "LFAIMAGES/standard 2-20/3e5 + no atps 2.JPG",  "conc": 3e5},
     # {"file": "LFAIMAGES/standard 2-20/no atps 1 REAL.JPG",  "conc": 3e5},
+    
+    # 2-27
+    {"file": "LFAIMAGES/2-27/3e5 atps 3_cropped.JPG",  "conc": 3e5},
+    {"file": "LFAIMAGES/2-27/3e5 no atps 3_cropped.JPG",  "conc": 3e5},
 ]
 
 # ── 2. Run analysis on every image ────────────────────────────────────────────

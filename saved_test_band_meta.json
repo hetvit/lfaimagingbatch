@@ -1,0 +1,14 @@
+{
+  "crop_bounds": [
+    0,
+    417,
+    0,
+    141
+  ],
+  "mask_shape": [
+    418,
+    142
+  ],
+  "row_radius": 10,
+  "edge_margin_frac": 0.01
+}

@@ -117,7 +117,7 @@ def visualize_rowwise_thresholding(
     stat="mean",
     smooth_ksize=51,
     k=4.0,
-    exclude_center_frac=0.0,
+    exclude_center_frac_OLD=0.0,
     min_run=3,
     expand=2,
     keep_top_bands=2,
@@ -151,7 +151,7 @@ def visualize_rowwise_thresholding(
         corrected,
         stat=stat,
         smooth_ksize=smooth_ksize,
-        exclude_center_frac=exclude_center_frac,
+        exclude_center_frac_OLD=exclude_center_frac_OLD,
         k=k,
     )
 
@@ -164,7 +164,7 @@ def visualize_rowwise_thresholding(
         an,
         stat=stat,
         smooth_ksize=smooth_ksize,
-        exclude_center_frac=exclude_center_frac,
+        exclude_center_frac=0.20,
         k=k,
         min_run=min_run,
         expand=expand,
@@ -209,9 +209,15 @@ def visualize_rowwise_thresholding(
     ax4.legend()
 
     # (E) final mask
+    binary_vis = cv2.bitwise_not(final_mask)
+    bordered = cv2.copyMakeBorder(
+        binary_vis, 2, 2, 2, 2,
+        cv2.BORDER_CONSTANT, value=0
+    )
+    
     ax5 = fig.add_subplot(2, 3, 5)
-    ax5.imshow(final_mask, cmap="gray")
-    ax5.set_title("Final Row-wise Mask")
+    ax5.imshow(bordered, cmap="gray", vmin=0, vmax=255)
+    ax5.set_title("Binarized Mask")
     ax5.axis("off")
 
     # Third column bottom-right is left empty

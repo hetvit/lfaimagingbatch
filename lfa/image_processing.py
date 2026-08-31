@@ -463,7 +463,7 @@ def rowwise_binarize_corrected(
     an,
     stat="mean",
     smooth_ksize=51,
-    exclude_center_frac=0.00, # set to 0
+    exclude_center_frac=0.20, # optimized for 0.2
     k=4.0,
     min_run=3,              # minimum consecutive rows to keep as a band
     expand=2,               # expand hits by +/- expand rows (thicken band)
@@ -624,7 +624,25 @@ def classify_two_band_top_bottom(an, min_bands=1, max_bands=2, edge_margin_rows=
         status = "INVALID"
         reason = "Band pattern not 1-top or 1-top+1-bottom."
 
-    return {
+    # always compute control-line intensity if we have a top run ---
+    ctrl_metrics = {}
+    if top_runs and an.original_image is not None:
+        # Use the first (and for NEGATIVE, only) top run as control band
+        ctrl_run = top_runs[0]
+
+        gray = cv2.cvtColor(an.original_image, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        bg = float(np.percentile(gray, 90))  # bright background estimate
+
+        ctrl_mean = band_mean_intensity_on_original(an, ctrl_run)
+        ctrl_signal = max(bg - ctrl_mean, 1e-6)
+
+        ctrl_metrics = {
+            "background_gray_p90": bg,
+            "control_mean": ctrl_mean,
+            "control_signal": ctrl_signal,
+        }
+
+    out = {
         "status": status,
         "runs": runs,
         "top_runs": top_runs,
@@ -633,6 +651,8 @@ def classify_two_band_top_bottom(an, min_bands=1, max_bands=2, edge_margin_rows=
         "num_bands": len(runs),
         "reason": reason,
     }
+    out.update(ctrl_metrics)
+    return out
     
 def band_mean_intensity_on_original(an, run, half=None, edge_margin_frac=0.01, row_radius=10):
     """
@@ -781,6 +801,68 @@ def compute_relative_intensity_from_runs(an, top_run, bottom_run):
         "test_signal": test_signal,
         "relative_intensity": float(test_signal / ctrl_signal),
     }
+
+
+def estimate_negative_test_run(an, control_run):
+    """
+    Estimate where the test line should be for a NEGATIVE LFA.
+
+    The detected control line is in the top half.
+    Its distance from the top edge is mirrored from the bottom edge,
+    and the estimated test region has the same height as the control region.
+
+    Parameters
+    ----------
+    an : SimpleLFAAnalyzer
+    control_run : tuple
+        (start_row, end_row) of detected control line
+
+    Returns
+    -------
+    tuple
+        (start_row, end_row) of estimated test-line region
+    """
+
+    H = an.original_image.shape[0]
+
+    ctrl_s, ctrl_e = control_run
+    ctrl_s = int(ctrl_s)
+    ctrl_e = int(ctrl_e)
+
+    # Height of detected control-line region
+    band_height = ctrl_e - ctrl_s + 1
+
+    # Distance from top edge to start of control region
+    top_distance = ctrl_s
+
+    # Mirror same distance from bottom edge
+    test_e = (H - 1) - top_distance
+    test_s = test_e - band_height + 1
+
+    # Safety edge cases
+    test_s = max(0, test_s)
+    test_e = min(H - 1, test_e)
+
+    return (test_s, test_e)
+
+
+def compute_negative_relative_intensity(an, control_run):
+    """
+    For a NEGATIVE LFA:
+      1. Estimate where the missing test line should be.
+      2. Use the same intensity calculation as positive samples.
+      3. Return the estimated test region and relative intensity.
+    """
+
+    estimated_test_run = estimate_negative_test_run(an, control_run)
+
+    # Reuse the same quantification function used for positives
+    ri = compute_relative_intensity_from_runs(an, control_run, estimated_test_run)
+
+    # Add information showing that the test region was estimated
+    ri["estimated_test_run"] = estimated_test_run
+
+    return ri
 
 
 def classify_one_band_top_only(an, edge_margin_rows=5):
@@ -1035,4 +1117,9 @@ def auto_crop_remove_bright_edges(
     maybe_crop_attr("background_image")
     maybe_crop_attr("binary_mask")
 
+    # Store crop bounds on the analyzer for later reuse
+    an._crop_bounds = (top, bottom, left, right)
+
     return (top, bottom, left, right)
+
+

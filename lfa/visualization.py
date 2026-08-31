@@ -491,11 +491,13 @@ def plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=None)
         unused_ax = axes_grid[1, n_cols - 1]
         unused_ax.axis("off")
 
+    font=15
+
     # --- 0) Optional uncropped panel ---
     if has_uncropped:
         uncropped_rgb = cv2.cvtColor(uncropped_image, cv2.COLOR_BGR2RGB)
         axes[0].imshow(uncropped_rgb)
-        axes[0].set_title("Raw Image\n(Uncropped)", fontsize=10)
+        axes[0].set_title("Raw Image\n(Uncropped)", fontsize=font)
         axes[0].axis("off")
 
     # Convenience aliases for indices (into axes list)
@@ -510,22 +512,22 @@ def plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=None)
 
     # 1) Cropped raw image (RGB)
     axes[i_cropped].imshow(orig_rgb)
-    axes[i_cropped].set_title("Auto-cropped Image", fontsize=10)
+    axes[i_cropped].set_title("Auto-cropped\nImage", fontsize=font)
     axes[i_cropped].axis("off")
 
     # 2) Inverted image (preprocessed)
     axes[i_preproc].imshow(inv, cmap="hot")
-    axes[i_preproc].set_title("Preprocessed", fontsize=10)
+    axes[i_preproc].set_title("Preprocessed", fontsize=font)
     axes[i_preproc].axis("off")
 
     # 3) Background image that was subtracted
     axes[i_bg].imshow(bg, cmap="hot")
-    axes[i_bg].set_title("Background\n(Morphological Opening)", fontsize=10)
+    axes[i_bg].set_title("Background\n(Morphological Opening)", fontsize=font)
     axes[i_bg].axis("off")
 
     # 4) Corrected image (no mask)
     axes[i_corr].imshow(corr, cmap="hot")
-    axes[i_corr].set_title("Background Subtracted\n(BG) Image", fontsize=10)
+    axes[i_corr].set_title("Background Subtracted\n(BG) Image", fontsize=font)
     axes[i_corr].axis("off")
 
     # 5) Row score trace (row-wise threshold profile)
@@ -535,10 +537,10 @@ def plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=None)
     axes[i_rowtrace].plot(T_row,     y, linestyle=":",  linewidth=2.0, label="threshold")
 
     axes[i_rowtrace].invert_yaxis()
-    axes[i_rowtrace].set_title("Row-wise Threshold Profile", fontsize=10)
+    axes[i_rowtrace].set_title("Row-wise Threshold\nProfile", fontsize=font)
     axes[i_rowtrace].set_xlabel("Average Row Intensity Value")
     axes[i_rowtrace].set_ylabel("Row index")
-    axes[i_rowtrace].legend(fontsize=8)
+    axes[i_rowtrace].legend(fontsize=font/2)
 
     # 6) Binary mask (lines dark)
     binary_vis = cv2.bitwise_not(mask)
@@ -547,7 +549,7 @@ def plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=None)
         cv2.BORDER_CONSTANT, value=0
     )
     axes[i_binmask].imshow(bordered, cmap="gray", vmin=0, vmax=255)
-    axes[i_binmask].set_title("Binarized Mask", fontsize=10)
+    axes[i_binmask].set_title("Binarized Mask", fontsize=font)
     axes[i_binmask].axis("off")
 
     # 7) Corrected + mask overlay (colored)
@@ -560,7 +562,7 @@ def plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=None)
     overlay[..., 2] = color[2]
     overlay[..., 3] = 0.35 * m
     axes[i_corr_mask].imshow(overlay)
-    axes[i_corr_mask].set_title("BG Image\n+ Mask Overlay", fontsize=10)
+    axes[i_corr_mask].set_title("BG Image\n+ Mask Overlay", fontsize=font)
     axes[i_corr_mask].axis("off")
 
     # 8) Original + mask overlay + sampling regions
@@ -594,7 +596,7 @@ def plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=None)
         sample_overlay[..., 3] = 0.40 * sample_hits
         axes[i_final].imshow(sample_overlay)
 
-    axes[i_final].set_title("Raw Image + Mask\n+ Intensity Window", fontsize=10)
+    axes[i_final].set_title("Raw Image + Mask\n+ Intensity Window", fontsize=font)
     axes[i_final].axis("off")
 
     # --- Arrows between panels (now 2 rows) ---
@@ -662,6 +664,129 @@ def plot_lfa_final_panels(an, save_dir="lfa_strip_panels", uncropped_image=None)
     print(f"[DEBUG] Saved LFA debug panels to {out_path}")
     return out_path
 
+
+def visualize_negative_projected_rois_panel(analyzers, results_list, save_path=None):
+    """
+    Show all negative LFA strips in one panel.
+
+    CYAN    = exact control sampling ROI
+    MAGENTA = exact projected test sampling ROI
+
+    These are the exact sampling regions used for the
+    relative-intensity calculation.
+    """
+
+    import cv2
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from pathlib import Path
+    from lfa.image_processing import make_band_sampling_mask
+
+    if len(analyzers) != len(results_list):
+        raise ValueError("analyzers and results_list must have the same length.")
+
+    n = len(analyzers)
+
+    fig, axes = plt.subplots(1, n, figsize=(5 * n, 7), constrained_layout=True)
+    axes = np.atleast_1d(axes)
+
+    for ax, an, results in zip(axes, analyzers, results_list):
+
+        if results.get("status") != "NEGATIVE":
+            ax.text(0.5, 0.5, f"Not NEGATIVE\nStatus: {results.get('status')}",
+                    ha="center", va="center", transform=ax.transAxes)
+            ax.axis("off")
+            continue
+
+        # Get detected control and projected test runs
+        control_runs = results.get("top_runs", [])
+        projected_test_run = results.get("estimated_test_run")
+
+        if not control_runs or projected_test_run is None:
+            ax.text(0.5, 0.5, "Missing ROI information",
+                    ha="center", va="center", transform=ax.transAxes)
+            ax.axis("off")
+            continue
+
+        control_run = control_runs[0]
+
+        # Generate the exact sampling masks used for intensity measurement
+        control_mask = make_band_sampling_mask(
+            an, control_run, edge_margin_frac=0.01, row_radius=10
+        )
+
+        test_mask = make_band_sampling_mask(
+            an, projected_test_run, edge_margin_frac=0.01, row_radius=10
+        )
+
+        # Show original image
+        orig_rgb = cv2.cvtColor(an.original_image, cv2.COLOR_BGR2RGB)
+        ax.imshow(orig_rgb)
+
+        H, W = control_mask.shape
+
+        # CONTROL ROI — cyan
+        control_overlay = np.zeros((H, W, 4), dtype=np.float32)
+        control_overlay[..., :3] = np.array([0.0, 1.0, 1.0])
+        control_overlay[..., 3] = 0.40 * (control_mask > 0)
+        ax.imshow(control_overlay)
+
+        # PROJECTED TEST ROI — magenta
+        test_overlay = np.zeros((H, W, 4), dtype=np.float32)
+        test_overlay[..., :3] = np.array([1.0, 0.0, 1.0])
+        test_overlay[..., 3] = 0.40 * (test_mask > 0)
+        ax.imshow(test_overlay)
+
+        # Get exact sampling-window boundaries
+        ctrl_rows = np.where(np.any(control_mask > 0, axis=1))[0]
+        test_rows = np.where(np.any(test_mask > 0, axis=1))[0]
+
+        # Mark control sampling region
+        if len(ctrl_rows) > 0:
+            ctrl_s, ctrl_e = ctrl_rows[0], ctrl_rows[-1]
+
+            ax.axhline(ctrl_s, linestyle="--", linewidth=1.5)
+            ax.axhline(ctrl_e, linestyle="--", linewidth=1.5)
+
+            ax.text(W * 0.02, (ctrl_s + ctrl_e) / 2, "CONTROL",
+                    fontsize=10, fontweight="bold", va="center")
+
+        # Mark projected test sampling region
+        if len(test_rows) > 0:
+            test_s, test_e = test_rows[0], test_rows[-1]
+
+            ax.axhline(test_s, linestyle=":", linewidth=1.5)
+            ax.axhline(test_e, linestyle=":", linewidth=1.5)
+
+            ax.text(W * 0.02, (test_s + test_e) / 2, "PROJECTED TEST",
+                    fontsize=10, fontweight="bold", va="center")
+
+        # Values used in relative-intensity calculation
+        ctrl_mean = results.get("control_mean", float("nan"))
+        test_mean = results.get("test_mean", float("nan"))
+        ctrl_signal = results.get("control_signal", float("nan"))
+        test_signal = results.get("test_signal", float("nan"))
+        ri = results.get("relative_intensity", float("nan"))
+
+        filename = Path(an.image_path).name
+
+        ax.set_title(
+            f"{filename}\n"
+            f"Control mean = {ctrl_mean:.2f} | Test mean = {test_mean:.2f}\n"
+            f"Control signal = {ctrl_signal:.2f} | Test signal = {test_signal:.2f}\n"
+            f"RI = {ri:.4f}",
+            fontsize=9
+        )
+
+        ax.axis("off")
+
+    fig.suptitle("Negative LFA Projected Test-Line ROIs", fontsize=16, fontweight="bold")
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    plt.show()
+    return fig
 
 
 
